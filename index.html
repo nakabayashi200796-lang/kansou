@@ -1007,6 +1007,17 @@ function wireEditor() {
     normalizeBody(); syncHeading(); finishHeadings();
     markBlank(); scheduleSave();
   });
+  // 「#」を打った行でEnterを押したら、改行はせず、見出しを確定するだけにする（もう一度Enterで改行）。
+  // iPhone のキーボードは keydown を出さないことがあるので、beforeinput で受ける
+  body.addEventListener('beforeinput', e => {
+    if (e.inputType !== 'insertParagraph') return;
+    const b = curBlock();
+    if (!b || !b.dataset.pending) return;
+    if (!b.textContent.replace(MARK, '')) { b.className = 'p'; delete b.dataset.pending; return; }   // 「#」だけの行は見出しにせず、ふつうに改行する
+    e.preventDefault();
+    stripMark(b); delete b.dataset.pending;
+    placeCaret(b, true); markBlank(); scheduleSave();
+  });
   body.addEventListener('keydown', e => {
     if (e.key !== 'Backspace' || e.isComposing || e.keyCode === 229 || !getSelection().isCollapsed) return;
     const b = curBlock();
