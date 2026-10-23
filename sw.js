@@ -1,5 +1,5 @@
 /* 感想ノート — 電波が無くても開けるようにするための小さな仕掛け */
-const V = "kansou-v1";
+const V = "kansou-v2";
 const SHELL = ["./", "./index.html", "./config.js", "./manifest.webmanifest", "./icon-32.png", "./icon-180.png", "./icon-192.png", "./icon-512.png"];
 
 self.addEventListener("install", e => {

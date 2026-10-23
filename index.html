@@ -11,11 +11,11 @@ document.addEventListener('touchmove', e => { if (e.touches.length > 1) e.preven
 </script>
 <title>感想ノート</title>
 <link rel="manifest" href="./manifest.webmanifest">
-<meta name="theme-color" content="#f4efe6" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#1b1815" media="(prefers-color-scheme: dark)">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#1b1815">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="感想ノート">
 <link rel="apple-touch-icon" href="./icon-180.png">
 <link rel="icon" type="image/png" sizes="32x32" href="./icon-32.png">
@@ -23,43 +23,28 @@ document.addEventListener('touchmove', e => { if (e.touches.length > 1) e.preven
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700&family=Zen+Old+Mincho:wght@600;700&display=swap">
 <style>
-/* 紙のノートと映画の半券。地は生成りの紙、文字は墨、差し色は劇場の幕の赤 */
+/* 夜の映画館。暗い紙に、劇場の幕の赤を差す。ほかの自作アプリと同じく、いつも暗い見た目に固定する */
 :root {
-  --paper: #f4efe6;
-  --paper-2: #ebe4d7;
-  --sheet: #fffdf8;
-  --ink: #2a2521;
-  --ink-2: #5d544c;
-  --muted: #8d837a;
-  --line: #ddd4c5;
-  --accent: #b13b2c;
-  --accent-ink: #ffffff;
-  --accent-soft: #f3dcd6;
-  --drop: #f0d9a8;
-  --shadow: 0 1px 2px rgba(60, 40, 20, .08), 0 4px 14px rgba(60, 40, 20, .07);
+  color-scheme: dark;
+  --paper: #1b1815;
+  --paper-2: #24201c;
+  --sheet: #2a2520;
+  --ink: #efe8dd;
+  --ink-2: #c9bfb2;
+  --muted: #958a7e;
+  --line: #3b352e;
+  --accent: #e0644f;
+  --accent-ink: #1b1815;
+  --accent-soft: #4a2a23;
+  --drop: #5a4523;
+  --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 4px 14px rgba(0, 0, 0, .25);
   --sans: "Zen Kaku Gothic New", "Hiragino Sans", "Yu Gothic", system-ui, sans-serif;
   --serif: "Zen Old Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
   --safe-b: env(safe-area-inset-bottom, 0px);
   --safe-t: env(safe-area-inset-top, 0px);
 }
-@media (prefers-color-scheme: dark) {
-  :root {
-    --paper: #1b1815;
-    --paper-2: #24201c;
-    --sheet: #2a2520;
-    --ink: #efe8dd;
-    --ink-2: #c9bfb2;
-    --muted: #958a7e;
-    --line: #3b352e;
-    --accent: #e0644f;
-    --accent-ink: #1b1815;
-    --accent-soft: #4a2a23;
-    --drop: #5a4523;
-    --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 4px 14px rgba(0, 0, 0, .25);
-  }
-}
 * { box-sizing: border-box; }
-html, body { height: 100%; }
+html, body { height: 100%; overflow: hidden; overscroll-behavior: none; }
 body {
   margin: 0; background: var(--paper); color: var(--ink);
   font-family: var(--sans); font-size: 16px; line-height: 1.6;
@@ -82,7 +67,7 @@ input { font: inherit; color: inherit; }
 .login-err { color: var(--accent); font-size: 13px; margin-top: 14px; min-height: 1.6em; }
 
 /* 全体の枠：PCは左にフォルダの木、右に中身。iPhoneは1列 */
-#app { display: flex; height: 100%; }
+#app { display: flex; height: 100%; height: 100dvh; }
 #side {
   width: 260px; flex: none; border-right: 1px solid var(--line); background: var(--paper-2);
   display: flex; flex-direction: column; padding: 18px 10px 12px; overflow: hidden;
@@ -114,6 +99,7 @@ input { font: inherit; color: inherit; }
 .side-foot button { color: var(--ink-2); text-decoration: underline; font-size: 12px; margin-top: 4px; }
 
 #main { flex: 1; min-width: 0; display: flex; flex-direction: column; height: 100%; }
+#login { overflow: auto; }
 .top {
   display: flex; align-items: center; gap: 10px; padding: calc(12px + var(--safe-t)) 24px 12px;
   border-bottom: 1px solid var(--line); background: var(--paper);
@@ -132,7 +118,7 @@ input { font: inherit; color: inherit; }
 .icon-btn:hover { background: rgba(127, 110, 90, .12); }
 .m-only { display: none; }
 
-#list, #editor { flex: 1; overflow: auto; -webkit-overflow-scrolling: touch; }
+#list, #editor { flex: 1; min-height: 0; overflow: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
 .wrap { max-width: 1100px; margin: 0 auto; padding: 18px 24px calc(110px + var(--safe-b)); }
 
 .crumbs { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; font-size: 22px; font-family: var(--serif); margin-bottom: 10px; }
@@ -217,7 +203,7 @@ input { font: inherit; color: inherit; }
 
 /* ノートの中 */
 .ed { max-width: 760px; margin: 0 auto; padding: 8px 24px calc(120px + var(--safe-b)); }
-.ed-top { display: flex; align-items: center; gap: 6px; padding: 10px 0; position: sticky; top: 0; background: var(--paper); z-index: 3; }
+.ed-top { display: flex; align-items: center; gap: 6px; padding: calc(10px + var(--safe-t)) 0 10px; position: sticky; top: 0; background: var(--paper); z-index: 3; }
 .ed-top .back { display: flex; align-items: center; gap: 4px; color: var(--ink-2); font-size: 14px; padding: 8px 10px 8px 4px; border-radius: 8px; min-width: 0; }
 .ed-top .back span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ed-top .back:hover { background: rgba(127, 110, 90, .12); }
@@ -247,7 +233,7 @@ input { font: inherit; color: inherit; }
 .imgs .add span { font-size: 24px; line-height: 1; }
 .imgs .busy { flex: none; width: 96px; height: 128px; border-radius: 8px; background: var(--paper-2); display: grid; place-items: center; font-size: 12px; color: var(--muted); }
 .tools {
-  position: sticky; top: 52px; z-index: 2; display: flex; gap: 6px; padding: 6px 0; background: var(--paper);
+  position: sticky; top: calc(60px + var(--safe-t)); z-index: 2; display: flex; gap: 6px; padding: 6px 0; background: var(--paper);
   border-bottom: 1px solid var(--line); margin-bottom: 12px;
 }
 .tools button { height: 32px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--sheet); font-size: 13px; font-weight: 700; }
@@ -320,8 +306,23 @@ input { font: inherit; color: inherit; }
   .ngrid { grid-template-columns: 1fr 1fr; gap: 18px 12px; }
   .ed { padding: 0 16px calc(120px + var(--safe-b)); }
   .ed-title { font-size: 25px; }
-  .tools { top: 52px; }
+  .tools { top: calc(60px + var(--safe-t)); }
   #fab { right: 18px; bottom: calc(18px + var(--safe-b)); }
+  /* 指で押しやすいように、押す部分と文字をひとまわり大きく */
+  .bar { flex-wrap: nowrap; gap: 6px; }
+  .chip { height: 40px; padding: 0 12px; font-size: 14px; }
+  .seg button { height: 38px; padding: 0 11px; font-size: 14px; }
+  .imgs-toggle { height: 40px; font-size: 14px; }
+  .tools button { height: 40px; padding: 0 16px; font-size: 14px; }
+  .more { width: 40px; height: 40px; font-size: 18px; }
+  .ncard .more { width: 36px; height: 36px; }
+  .ncard .t { font-size: 15px; }
+  .ncard .d, .sec-t, .saved { font-size: 13px; }
+  .ed-meta { font-size: 14px; }
+  .row { padding: 10px 6px 10px 12px; }
+  .row .th { width: 40px; height: 54px; }
+  .dlg .btns button { padding: 12px 18px; font-size: 15px; }
+  .sheet .menu button { padding: 16px 8px; }
   .ov.bottom { align-items: flex-end; padding: 0; }
   .ov.bottom .dlg { max-width: none; border-radius: 16px 16px 0 0; padding-bottom: calc(20px + var(--safe-b)); }
 }
