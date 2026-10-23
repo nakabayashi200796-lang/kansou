@@ -208,7 +208,6 @@ input { font: inherit; color: inherit; }
 .ed-top .back span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ed-top .back:hover { background: rgba(127, 110, 90, .12); }
 .ed-top .grow { flex: 1; }
-.saved { font-size: 12px; color: var(--muted); white-space: nowrap; }
 .ed-title {
   width: 100%; border: 0; outline: 0; background: none; font-family: var(--serif); font-weight: 700;
   font-size: 30px; line-height: 1.35; padding: 8px 0 4px; letter-spacing: .02em;
@@ -317,7 +316,7 @@ input { font: inherit; color: inherit; }
   .more { width: 40px; height: 40px; font-size: 18px; }
   .ncard .more { width: 36px; height: 36px; }
   .ncard .t { font-size: 15px; }
-  .ncard .d, .sec-t, .saved { font-size: 13px; }
+  .ncard .d, .sec-t { font-size: 13px; }
   .ed-meta { font-size: 14px; }
   .row { padding: 10px 6px 10px 12px; }
   .row .th { width: 40px; height: 54px; }
@@ -852,7 +851,6 @@ function openEditor() {
   host.innerHTML = `<div class="ed">
     <div class="ed-top">
       <button class="back" data-act="back">‹ <span class="bk"></span></button><span class="grow"></span>
-      <span class="saved" id="saved"></span>
       <button class="icon-btn" data-act="noteMenu" aria-label="メニュー">⋯</button>
     </div>
     <input class="ed-title" id="edTitle" placeholder="作品名" enterkeyhint="next">
@@ -995,9 +993,9 @@ function wireEditor() {
     updateHBtn(); scheduleSave();
   });
 }
-function setSaved(s) { const e = $('#saved'); if (e) e.textContent = s; }
+/* 保存は黙って行う（「保存しました」は出さない。失敗したときだけ write がお知らせを出す） */
 function scheduleSave() {
-  S.dirty = true; setSaved('');
+  S.dirty = true;
   clearTimeout(S.saveT); S.saveT = setTimeout(flushSave, 700);
 }
 function flushSave() {
@@ -1006,13 +1004,9 @@ function flushSave() {
   S.dirty = false;
   const id = ED.id, title = ED.title.value.trim(), body = bodyFromDom(ED.body);
   const n = S.notes.get(id);
-  if (n && (n.title || '') === title && (n.body || '') === body) { setSaved(savedLabel()); return; }
-  setSaved('保存中…');
-  write([{ col: 'notes', id, data: { title, titleKey: norm(title), body, updatedAt: Date.now() } }])
-    .then(() => { if (ED && ED.id === id && !S.dirty) setSaved(savedLabel()); });
-  if (DEMO || !navigator.onLine) setSaved(savedLabel());
+  if (n && (n.title || '') === title && (n.body || '') === body) return;
+  write([{ col: 'notes', id, data: { title, titleKey: norm(title), body, updatedAt: Date.now() } }]);
 }
-function savedLabel() { return DEMO ? '保存しました' : navigator.onLine ? '保存しました' : '端末に保存（電波が戻ったら送ります）'; }
 document.addEventListener('selectionchange', updateHBtn);
 window.addEventListener('pagehide', flushSave);
 document.addEventListener('visibilitychange', () => { if (document.hidden) flushSave(); });
