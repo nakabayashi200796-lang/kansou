@@ -231,12 +231,7 @@ input { font: inherit; color: inherit; }
 }
 .imgs .add span { font-size: 24px; line-height: 1; }
 .imgs .busy { flex: none; width: 96px; height: 128px; border-radius: 8px; background: var(--paper-2); display: grid; place-items: center; font-size: 12px; color: var(--muted); }
-.tools {
-  position: sticky; top: calc(60px + var(--safe-t)); z-index: 2; display: flex; gap: 6px; padding: 6px 0; background: var(--paper);
-  border-bottom: 1px solid var(--line); margin-bottom: 12px;
-}
-.tools button { height: 32px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--sheet); font-size: 13px; font-weight: 700; }
-.tools button.on { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.ed .body { border-top: 1px solid var(--line); padding-top: 14px; }
 .body {
   outline: 0; min-height: 50vh; font-size: 17px; line-height: 1.9; word-break: break-word; white-space: pre-wrap;
   -webkit-user-select: text; user-select: text; caret-color: var(--accent);
@@ -305,14 +300,12 @@ input { font: inherit; color: inherit; }
   .ngrid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px 12px; }
   .ed { padding: 0 16px calc(120px + var(--safe-b)); }
   .ed-title { font-size: 25px; }
-  .tools { top: calc(60px + var(--safe-t)); }
   #fab { right: 18px; bottom: calc(18px + var(--safe-b)); }
   /* 指で押しやすいように、押す部分と文字をひとまわり大きく */
   .bar { flex-wrap: nowrap; gap: 6px; }
   .chip { height: 40px; padding: 0 12px; font-size: 14px; }
   .seg button { height: 38px; padding: 0 11px; font-size: 14px; }
   .imgs-toggle { height: 40px; font-size: 14px; }
-  .tools button { height: 40px; padding: 0 16px; font-size: 14px; }
   .more { width: 40px; height: 40px; font-size: 18px; }
   .ncard .more { width: 36px; height: 36px; }
   .ncard .t { font-size: 15px; }
@@ -857,7 +850,6 @@ function openEditor() {
     <div class="ed-meta"><span>作成日 ${ymd(n.createdAt)}</span><span class="path" data-act="moveNote"></span></div>
     <button class="imgs-toggle" id="imgsToggle" data-act="toggleImgs"><span class="ic">🖼</span><span class="lbl"></span><span class="arrow">▸</span></button>
     <div class="imgs" id="imgs" hidden></div>
-    <div class="tools"><button id="hBtn" aria-pressed="false">見出し</button></div>
     <div class="body" id="edBody" contenteditable="true" spellcheck="false"></div>
   </div>`;
   host.scrollTop = 0;
@@ -880,7 +872,7 @@ function refreshEditor() {
     if ((n.title || '') !== ED.title.value) ED.title.value = n.title || '';
     if ((n.body || '') !== bodyFromDom(ED.body)) ED.body.innerHTML = bodyToHtml(n.body || '');
   }
-  markBlank(); renderImgs(n); updateHBtn();
+  markBlank(); renderImgs(n);
 }
 
 /* 自由欄の中身：1行ずつの div。見出しの行は class="h"。保存するときは見出しの行の頭に「# 」を付けた文字にする */
@@ -956,9 +948,38 @@ function placeCaret(node, atEnd) {
   const s = getSelection(); s.removeAllRanges(); s.addRange(r);
 }
 function markBlank() { if (ED) ED.body.classList.toggle('blank', !ED.body.textContent && ED.body.children.length <= 1); }
-function updateHBtn() {
-  const b = curBlock(), on = !!(b && b.classList.contains('h'));
-  const btn = $('#hBtn'); if (btn) { btn.classList.toggle('on', on); btn.setAttribute('aria-pressed', on); }
+/* 見出しは、行の最初に「#」（全角の「＃」も）を打つと、その行が見出しに変わる。
+   見出しの行の先頭でバックスペースを押すと、ふつうの文字に戻る */
+function caretOffsetIn(b) {
+  const sel = getSelection();
+  if (!sel.rangeCount || !b.contains(sel.anchorNode)) return null;
+  const r = document.createRange(); r.selectNodeContents(b); r.setEnd(sel.anchorNode, sel.anchorOffset);
+  return r.toString().length;
+}
+function setBlockText(b, text, caret) {
+  b.textContent = text;
+  if (!text) b.innerHTML = '<br>';
+  const r = document.createRange();
+  if (b.firstChild && b.firstChild.nodeType === 3) r.setStart(b.firstChild, Math.max(0, Math.min(caret, text.length)));
+  else r.setStart(b, 0);
+  r.collapse(true);
+  const s = getSelection(); s.removeAllRanges(); s.addRange(r);
+}
+function hashToHeading() {
+  const b = curBlock(); if (!b) return;
+  ED.body.querySelectorAll('[data-fresh]').forEach(x => { if (x !== b || !x.classList.contains('h')) delete x.dataset.fresh; });
+  const t = b.textContent;
+  if (!b.classList.contains('h')) {
+    const m = t.match(/^[#＃][ 　]?/); if (!m) return;
+    const pos = caretOffsetIn(b) ?? m[0].length;
+    b.className = 'h'; b.dataset.fresh = '1';
+    setBlockText(b, t.slice(m[0].length), pos - m[0].length);
+  } else if (b.dataset.fresh) {   // 「#」のすぐあとに打った空白は、見出しの文字に入れない
+    delete b.dataset.fresh;
+    const m = t.match(/^[ 　]+/); if (!m) return;
+    const pos = caretOffsetIn(b) ?? 0;
+    setBlockText(b, t.slice(m[0].length), pos - m[0].length);
+  }
 }
 function wireEditor() {
   const { title, body } = ED;
@@ -975,7 +996,16 @@ function wireEditor() {
         if (!prev.textContent && b.textContent) prev.className = 'p'; else b.className = 'p';
       }
     }
-    normalizeBody(); markBlank(); updateHBtn(); scheduleSave();
+    normalizeBody();
+    if (!e.isComposing) hashToHeading();   // 日本語の変換中は触らない（確定したときに compositionend で見る）
+    markBlank(); scheduleSave();
+  });
+  body.addEventListener('compositionend', () => { hashToHeading(); scheduleSave(); });
+  body.addEventListener('keydown', e => {
+    if (e.key !== 'Backspace' || e.isComposing || e.keyCode === 229 || !getSelection().isCollapsed) return;
+    const b = curBlock();
+    if (!b || !b.classList.contains('h') || caretOffsetIn(b) !== 0) return;
+    e.preventDefault(); b.className = 'p'; delete b.dataset.fresh; scheduleSave();
   });
   body.addEventListener('paste', e => {
     e.preventDefault();
@@ -984,14 +1014,6 @@ function wireEditor() {
   });
   body.addEventListener('drop', e => e.preventDefault());
   body.addEventListener('blur', flushSave);
-  const hb = $('#hBtn');
-  hb.addEventListener('pointerdown', e => e.preventDefault());   // 押しても文字の入力位置が消えないように
-  hb.addEventListener('click', () => {
-    let b = curBlock();
-    if (!b) { b = body.lastElementChild; placeCaret(b, true); }
-    b.className = b.classList.contains('h') ? 'p' : 'h';
-    updateHBtn(); scheduleSave();
-  });
 }
 /* 保存は黙って行う（「保存しました」は出さない。失敗したときだけ write がお知らせを出す） */
 function scheduleSave() {
@@ -1007,7 +1029,6 @@ function flushSave() {
   if (n && (n.title || '') === title && (n.body || '') === body) return;
   write([{ col: 'notes', id, data: { title, titleKey: norm(title), body, updatedAt: Date.now() } }]);
 }
-document.addEventListener('selectionchange', updateHBtn);
 window.addEventListener('pagehide', flushSave);
 document.addEventListener('visibilitychange', () => { if (document.hidden) flushSave(); });
 
