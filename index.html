@@ -880,7 +880,7 @@ function bodyToHtml(text) {
   const lines = (text || '').split('\n');
   return lines.map(l => {
     let h = false, t = l;
-    if (l.startsWith('# ')) { h = true; t = l.slice(2); }
+    if (l.startsWith('# ')) { h = true; t = l.slice(2).replace(MARK, ''); }   // 前の作りで見出しに残った「#」も消す
     else if (/^\\+# /.test(l)) t = l.slice(1);
     return `<div class="${h ? 'h' : 'p'}">${t ? esc(t) : '<br>'}</div>`;
   }).join('');
@@ -903,7 +903,9 @@ function bodyFromDom(el) {
   const out = [];
   for (const b of el.children) {
     const h = b.classList.contains('h');
-    for (const t of blockLines(b)) out.push(h ? (t ? '# ' + t : '') : (/^\\*# /.test(t) ? '\\' + t : t));
+    const lines = blockLines(b);
+    if (b.dataset.pending) lines[0] = lines[0].replace(MARK, '');   // まだ「#」が見えている見出しの行
+    for (const t of lines) out.push(h ? (t ? '# ' + t : '') : (/^\\*# /.test(t) ? '\\' + t : t));
   }
   return out.join('\n').replace(/\n+$/, '');
 }
@@ -949,36 +951,42 @@ function placeCaret(node, atEnd) {
 }
 function markBlank() { if (ED) ED.body.classList.toggle('blank', !ED.body.textContent && ED.body.children.length <= 1); }
 /* 見出しは、行の最初に「#」（全角の「＃」も）を打つと、その行が見出しに変わる。
+   打っている最中の行の文字には触らない（iPhone のキーボードは打ちかけの文字を覚えていて、
+   こちらが「#」を消すと入れ直してしまう）。見た目だけ先に見出しにして、「#」はその行から離れたときに消す。
    見出しの行の先頭でバックスペースを押すと、ふつうの文字に戻る */
+const MARK = /^[#＃][ 　 ]*/;
 function caretOffsetIn(b) {
   const sel = getSelection();
   if (!sel.rangeCount || !b.contains(sel.anchorNode)) return null;
   const r = document.createRange(); r.selectNodeContents(b); r.setEnd(sel.anchorNode, sel.anchorOffset);
   return r.toString().length;
 }
-function setBlockText(b, text, caret) {
-  b.textContent = text;
-  if (!text) b.innerHTML = '<br>';
-  const r = document.createRange();
-  if (b.firstChild && b.firstChild.nodeType === 3) r.setStart(b.firstChild, Math.max(0, Math.min(caret, text.length)));
-  else r.setStart(b, 0);
-  r.collapse(true);
-  const s = getSelection(); s.removeAllRanges(); s.addRange(r);
-}
-function hashToHeading() {
+function syncHeading() {          // 打っている行：見た目（見出しかどうか）だけを合わせる。文字は触らない
   const b = curBlock(); if (!b) return;
-  ED.body.querySelectorAll('[data-fresh]').forEach(x => { if (x !== b || !x.classList.contains('h')) delete x.dataset.fresh; });
-  const t = b.textContent;
-  if (!b.classList.contains('h')) {
-    const m = t.match(/^[#＃][ 　]?/); if (!m) return;
-    const pos = caretOffsetIn(b) ?? m[0].length;
-    b.className = 'h'; b.dataset.fresh = '1';
-    setBlockText(b, t.slice(m[0].length), pos - m[0].length);
-  } else if (b.dataset.fresh) {   // 「#」のすぐあとに打った空白は、見出しの文字に入れない
-    delete b.dataset.fresh;
-    const m = t.match(/^[ 　]+/); if (!m) return;
-    const pos = caretOffsetIn(b) ?? 0;
-    setBlockText(b, t.slice(m[0].length), pos - m[0].length);
+  const starts = /^[#＃]/.test(b.textContent);
+  if (starts && !b.classList.contains('h')) { b.className = 'h'; b.dataset.pending = '1'; }
+  else if (!starts && b.dataset.pending) { b.className = 'p'; delete b.dataset.pending; }
+}
+function stripMark(b) {           // 行の頭の「#」とそのあとの空白を消す（文字のかたまりを入れ替えずに削る）
+  const w = document.createTreeWalker(b, NodeFilter.SHOW_TEXT);
+  let n, first = true;
+  while ((n = w.nextNode())) {
+    const s = n.nodeValue; let i = 0;
+    if (first) { if (!s) continue; first = false; if (!/[#＃]/.test(s[0])) return false; i = 1; }
+    while (i < s.length && /[ 　 ]/.test(s[i])) i++;
+    n.nodeValue = s.slice(i);
+    if (n.nodeValue) break;
+  }
+  if (!b.textContent) b.innerHTML = '<br>';
+  return true;
+}
+function finishHeadings() {       // 離れた行の「#」を消して、見出しを確定する
+  if (!ED) return;
+  const cur = document.activeElement === ED.body ? curBlock() : null;
+  for (const b of ED.body.querySelectorAll('[data-pending]')) {
+    if (b === cur) continue;
+    if (!stripMark(b)) b.className = 'p';
+    delete b.dataset.pending;
   }
 }
 function wireEditor() {
@@ -996,16 +1004,14 @@ function wireEditor() {
         if (!prev.textContent && b.textContent) prev.className = 'p'; else b.className = 'p';
       }
     }
-    normalizeBody();
-    if (!e.isComposing) hashToHeading();   // 日本語の変換中は触らない（確定したときに compositionend で見る）
+    normalizeBody(); syncHeading(); finishHeadings();
     markBlank(); scheduleSave();
   });
-  body.addEventListener('compositionend', () => { hashToHeading(); scheduleSave(); });
   body.addEventListener('keydown', e => {
     if (e.key !== 'Backspace' || e.isComposing || e.keyCode === 229 || !getSelection().isCollapsed) return;
     const b = curBlock();
-    if (!b || !b.classList.contains('h') || caretOffsetIn(b) !== 0) return;
-    e.preventDefault(); b.className = 'p'; delete b.dataset.fresh; scheduleSave();
+    if (!b || !b.classList.contains('h') || b.dataset.pending || caretOffsetIn(b) !== 0) return;
+    e.preventDefault(); b.className = 'p'; scheduleSave();
   });
   body.addEventListener('paste', e => {
     e.preventDefault();
@@ -1013,8 +1019,9 @@ function wireEditor() {
     t.split('\n').forEach((p, i) => { if (i) document.execCommand('insertParagraph'); if (p) document.execCommand('insertText', false, p); });
   });
   body.addEventListener('drop', e => e.preventDefault());
-  body.addEventListener('blur', flushSave);
+  body.addEventListener('blur', () => { finishHeadings(); flushSave(); });
 }
+document.addEventListener('selectionchange', () => { if (ED && ED.body.querySelector('[data-pending]')) finishHeadings(); });
 /* 保存は黙って行う（「保存しました」は出さない。失敗したときだけ write がお知らせを出す） */
 function scheduleSave() {
   S.dirty = true;
